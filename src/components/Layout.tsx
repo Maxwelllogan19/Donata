@@ -12,20 +12,50 @@ export default function Layout() {
   const [isAuthenticating, setIsAuthenticating] = React.useState(false);
 
   React.useEffect(() => {
-    // Handle redirect result
-    getRedirectResult(auth).then(() => {
-      // Logic handled by onAuthStateChanged
-    }).catch((error) => {
-      console.error("Redirect auth error", error);
-      if (error.code !== 'auth/popup-closed-by-user') {
-        setAuthError("Erro na autenticação. Tente novamente.");
+    let mounted = true;
+
+    // Safety timeout to avoid infinite loading if Firebase doesn't respond
+    const timeout = setTimeout(() => {
+      if (mounted && loading) {
+        setLoading(false);
+        setAuthError("Tempo de carregamento esgotado. Verifique sua conexão.");
+      }
+    }, 10000);
+
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (mounted) {
+        setUser(user);
+        setLoading(false);
+        clearTimeout(timeout);
+      }
+    }, (error) => {
+      console.error("Auth state error", error);
+      if (mounted) {
+        setLoading(false);
+        setAuthError("Erro ao verificar autenticação.");
+        clearTimeout(timeout);
       }
     });
 
-    return onAuthStateChanged(auth, (user) => {
-      setUser(user);
-      setLoading(false);
-    });
+    // Check for redirect result only after mount
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result && mounted) {
+           console.log("Redirect sign-in successful", result.user);
+        }
+      })
+      .catch((error) => {
+        console.error("Redirect auth error", error);
+        if (mounted && error.code !== 'auth/popup-closed-by-user') {
+          setAuthError("Erro na autenticação. Tente entrar novamente.");
+        }
+      });
+
+    return () => {
+      mounted = false;
+      unsubscribe();
+      clearTimeout(timeout);
+    };
   }, []);
 
   const handleLogin = async () => {
