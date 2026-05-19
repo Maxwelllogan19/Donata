@@ -1,0 +1,64 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Primitives ---
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(data) { return isSignedIn() && data.ownerId == request.auth.uid; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+
+    // --- Validation Helpers ---
+    
+    function isValidEquipment(data) {
+      return data.keys().hasAll(['ownerId', 'name', 'category', 'unitPrice', 'totalStock'])
+        && data.ownerId == request.auth.uid
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 200
+        && data.category is string && data.category.size() <= 50
+        && data.unitPrice is number && data.unitPrice >= 0
+        && data.totalStock is number && data.totalStock >= 0
+        && (!data.keys().contains('description') || (data.description is string && data.description.size() <= 1000))
+        && (!data.keys().contains('imageUrl') || (data.imageUrl is string && data.imageUrl.size() <= 200000));
+    }
+
+    function isValidRental(data) {
+      return data.keys().hasAll(['ownerId', 'customerName', 'customerPhone', 'startDate', 'endDate', 'items', 'status', 'totalAmount', 'subtotal', 'discount', 'deliveryFee', 'createdAt', 'updatedAt'])
+        && data.ownerId == request.auth.uid
+        && data.customerName is string && data.customerName.size() > 0 && data.customerName.size() <= 200
+        && data.customerPhone is string && data.customerPhone.size() <= 30
+        && data.items is list && data.items.size() > 0
+        && data.status in ['pending', 'confirmed', 'active', 'returned', 'cancelled']
+        && data.totalAmount is number && data.totalAmount >= 0
+        && data.subtotal is number && data.subtotal >= 0
+        && data.discount is number && data.discount >= 0
+        && data.deliveryFee is number && data.deliveryFee >= 0;
+    }
+
+    // --- Collections ---
+
+    match /equipments/{equipId} {
+      allow list, get: if isSignedIn();
+      allow create: if isSignedIn() && isValidEquipment(incoming());
+      allow update: if isOwner(existing()) 
+        && isValidEquipment(incoming())
+        && incoming().ownerId == existing().ownerId; // Immutable ownerId
+      allow delete: if isOwner(existing());
+    }
+
+    match /rentals/{rentalId} {
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow get: if isOwner(existing());
+      allow create: if isSignedIn() && isValidRental(incoming());
+      allow update: if isOwner(existing()) 
+        && isValidRental(incoming())
+        && incoming().ownerId == existing().ownerId; // Immutable ownerId
+      allow delete: if isOwner(existing());
+    }
+  }
+}

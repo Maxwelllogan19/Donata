@@ -1,0 +1,65 @@
+{
+  "entities": {
+    "Equipment": {
+      "title": "Equipment",
+      "description": "Equipment available for rent (chairs, tables, tents, etc.)",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Name of the equipment" },
+        "description": { "type": "string", "description": "Detailed description" },
+        "category": { "type": "string", "description": "Category (e.g., chairs, tables, tents)" },
+        "unitPrice": { "type": "number", "description": "Rental price per unit per day" },
+        "totalStock": { "type": "integer", "description": "Total quantity in inventory" },
+        "imageUrl": { "type": "string", "description": "Optional image URL" }
+      },
+      "required": ["name", "unitPrice", "totalStock"]
+    },
+    "Rental": {
+      "title": "Rental",
+      "description": "A rental agreement between a customer and the business",
+      "type": "object",
+      "properties": {
+        "customerName": { "type": "string", "description": "Name of the client" },
+        "customerPhone": { "type": "string", "description": "Phone number of the client" },
+        "startDate": { "type": "string", "format": "date-time", "description": "When the rental starts" },
+        "endDate": { "type": "string", "format": "date-time", "description": "When the rental ends" },
+        "items": {
+          "type": "array",
+          "description": "List of equipment and quantities",
+          "items": {
+            "type": "object",
+            "properties": {
+              "equipmentId": { "type": "string" },
+              "name": { "type": "string" },
+              "quantity": { "type": "integer" },
+              "unitPrice": { "type": "number" },
+              "totalPrice": { "type": "number" }
+            }
+          }
+        },
+        "discount": { "type": "number", "description": "Discount applied" },
+        "deliveryFee": { "type": "number", "description": "Delivery or freight fee" },
+        "subtotal": { "type": "number", "description": "Total before discount" },
+        "totalAmount": { "type": "number", "description": "Final amount to be paid" },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "confirmed", "active", "returned", "cancelled"],
+          "description": "Current status of the rental"
+        },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["customerName", "startDate", "endDate", "items", "totalAmount", "status"]
+    }
+  },
+  "firestore": {
+    "/equipments": {
+      "schema": "Equipment",
+      "description": "Collection of available equipment"
+    },
+    "/rentals": {
+      "schema": "Rental",
+      "description": "Collection of rental agreements"
+    }
+  }
+}

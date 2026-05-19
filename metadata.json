@@ -1,0 +1,6 @@
+{
+  "name": "RentMaster",
+  "description": "Sistema completo para gestão de aluguéis de equipamentos para festas (cadeiras, mesas, tendas), com controle de estoque, agendamento, cálculos de valores e histórico mensal.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
