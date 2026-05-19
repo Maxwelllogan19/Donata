@@ -2,14 +2,26 @@ import React from 'react';
 import { Outlet, Navigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import { auth } from '../lib/firebase';
-import { onAuthStateChanged, User, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
-import { LogIn } from 'lucide-react';
+import { onAuthStateChanged, User, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult } from 'firebase/auth';
+import { LogIn, Loader2 } from 'lucide-react';
 
 export default function Layout() {
   const [user, setUser] = React.useState<User | null>(null);
   const [loading, setLoading] = React.useState(true);
+  const [authError, setAuthError] = React.useState<string | null>(null);
+  const [isAuthenticating, setIsAuthenticating] = React.useState(false);
 
   React.useEffect(() => {
+    // Handle redirect result
+    getRedirectResult(auth).then(() => {
+      // Logic handled by onAuthStateChanged
+    }).catch((error) => {
+      console.error("Redirect auth error", error);
+      if (error.code !== 'auth/popup-closed-by-user') {
+        setAuthError("Erro na autenticação. Tente novamente.");
+      }
+    });
+
     return onAuthStateChanged(auth, (user) => {
       setUser(user);
       setLoading(false);
@@ -17,18 +29,37 @@ export default function Layout() {
   }, []);
 
   const handleLogin = async () => {
+    setAuthError(null);
+    setIsAuthenticating(true);
     const provider = new GoogleAuthProvider();
+    
+    // Check if it's likely a mobile/embedded environment
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
     try {
-      await signInWithPopup(auth, provider);
-    } catch (error) {
+      if (isMobile) {
+        await signInWithRedirect(auth, provider);
+      } else {
+        await signInWithPopup(auth, provider);
+      }
+    } catch (error: any) {
       console.error("Login failed", error);
+      setIsAuthenticating(false);
+      if (error.code === 'auth/popup-blocked') {
+        await signInWithRedirect(auth, provider);
+      } else if (error.code !== 'auth/popup-closed-by-user') {
+        setAuthError("Falha ao entrar com Google. Tente novamente.");
+      }
     }
   };
 
   if (loading) {
     return (
       <div className="min-h-screen bg-cream flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <div className="flex flex-col items-center gap-4">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <p className="text-slate-500 text-sm">Carregando...</p>
+        </div>
       </div>
     );
   }
@@ -44,13 +75,29 @@ export default function Layout() {
             <h1 className="text-2xl font-bold text-slate-900">Bem-vindo ao RentMaster</h1>
             <p className="text-slate-500 mt-2">Acesse sua conta para gerenciar seus aluguéis.</p>
           </div>
+
+          {authError && (
+            <div className="p-3 bg-red-50 border border-red-100 rounded-lg text-red-600 text-sm">
+              {authError}
+            </div>
+          )}
+
           <button 
             onClick={handleLogin}
-            className="w-full btn btn-primary py-3 gap-3"
+            disabled={isAuthenticating}
+            className="w-full btn btn-primary py-3 gap-3 disabled:opacity-70"
           >
-            <img src="https://www.google.com/favicon.ico" className="w-5 h-5 bg-white rounded-full" alt="G" />
-            Entrar com Google
+            {isAuthenticating ? (
+              <Loader2 className="animate-spin" size={20} />
+            ) : (
+              <img src="https://www.google.com/favicon.ico" className="w-5 h-5 bg-white rounded-full" alt="G" />
+            )}
+            {isAuthenticating ? 'Conectando...' : 'Entrar com Google'}
           </button>
+          
+          <p className="text-[10px] text-slate-400">
+            Dica: Se o login travar no celular, tente abrir no navegador padrão Chrome ou Safari.
+          </p>
         </div>
       </div>
     );
